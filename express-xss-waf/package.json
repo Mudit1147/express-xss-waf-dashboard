@@ -1,0 +1,36 @@
+{
+  "name": "express-xss-waf",
+  "version": "1.0.0",
+  "description": "Lightweight, configurable Express.js middleware for detecting and mitigating reflected and stored XSS payloads.",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "jest --runInBand --detectOpenHandles",
+    "test:watch": "jest --watchALL",
+    "lint": "eslint src tests",
+    "test:coverage": "jest --coverage --runInBand"
+  },
+  "keywords": ["express", "xss", "waf", "security", "middleware", "web-application-firewall"],
+  "license": "MIT",
+  "peerDependencies": {
+    "express": ">=4.18.0 || >=5.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "express": "^5.1.0",
+    "jest": "^30.0.0",
+    "supertest": "^7.1.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "clearMocks": true,
+    "restoreMocks": true,
+    "coveragePathIgnorePatterns": ["/node_modules/", "/tests/"]
+  }
+}
