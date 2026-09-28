@@ -11,12 +11,20 @@
     "node": ">=18"
   },
   "scripts": {
+    "start": "node src/index.js",
     "test": "jest --runInBand --detectOpenHandles",
     "test:watch": "jest --watchALL",
     "lint": "eslint src tests",
     "test:coverage": "jest --coverage --runInBand"
   },
-  "keywords": ["express", "xss", "waf", "security", "middleware", "web-application-firewall"],
+  "keywords": [
+    "express",
+    "xss",
+    "waf",
+    "security",
+    "middleware",
+    "web-application-firewall"
+  ],
   "license": "MIT",
   "peerDependencies": {
     "express": ">=4.18.0 || >=5.0.0"
@@ -31,6 +39,9 @@
     "testEnvironment": "node",
     "clearMocks": true,
     "restoreMocks": true,
-    "coveragePathIgnorePatterns": ["/node_modules/", "/tests/"]
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "/tests/"
+    ]
   }
 }

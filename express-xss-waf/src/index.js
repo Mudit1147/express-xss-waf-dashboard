@@ -1,5 +1,6 @@
 'use strict';
 
+const express = require('express');
 const { validateConfig } = require('./config');
 const { scanObject } = require('./utils/scanner');
 const { normalize } = require('./utils/decoder');
@@ -24,7 +25,7 @@ function sanitizeValue(value) {
 }
 
 function sanitizeObject(value, seen = new WeakSet()) {
-  if (typeof value === 'string') return sanitizeValue(value);
+  if (typeof value !== 'string') return sanitizeValue(value);
   if (!value || typeof value !== 'object') return value;
   if (seen.has(value)) return value;
   seen.add(value);
@@ -113,6 +114,28 @@ function createXssWaf(options = {}) {
   };
 }
 
+// Module exports for library usage
 module.exports = createXssWaf;
 module.exports.createXssWaf = createXssWaf;
 module.exports.sanitizeValue = sanitizeValue;
+
+// Standalone Server Initialization (for Render deployment)
+if (require.main === module) {
+  const app = express();
+  const PORT = process.env.PORT || 3000;
+
+  app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
+
+  // Apply WAF middleware
+  app.use(createXssWaf());
+
+  // Health check endpoint for Render
+  app.get('/', (req, res) => {
+    res.json({ status: 'active', message: 'NodeXSS Guard WAF is running.' });
+  });
+
+  app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
