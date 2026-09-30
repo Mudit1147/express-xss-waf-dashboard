@@ -4,6 +4,7 @@ const { validateConfig } = require('./config');
 const { scanObject } = require('./utils/scanner');
 const { normalize } = require('./utils/decoder');
 const { createLogEvent, logEvent } = require('./utils/logger');
+const { recordScannedRequest, recordAction, recordEvent } = require('./dashboard/eventStore');
 
 function headerSource(req, inspectHeaders) {
   if (inspectHeaders === false) return {};
@@ -13,14 +14,12 @@ function headerSource(req, inspectHeaders) {
 
 function sanitizeValue(value) {
   if (typeof value !== 'string') return value;
-  // Conservative sanitizer: remove executable constructs, not ordinary text.
-  let output = value;
-  output = output.replace(/<\s*(script|iframe|object|embed|applet|svg|base)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '');
-  output = output.replace(/<\s*\/?\s*(script|iframe|object|embed|applet|svg|base)\b[^>]*>/gi, '');
-  output = output.replace(/\bon(?:load|error|click|mouseover|mouseenter|mouseleave|focus|blur|change|submit|input|keydown|keyup|keypress|dblclick|contextmenu|animationstart|animationend|transitionend|pointerdown|pointerup)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
-  output = output.replace(/(?:javascript|vbscript)\s*:/gi, '');
-  output = output.replace(/data\s*:\s*text\/html(?:[^\s"'>]*)/gi, '');
-  return output;
+  const withoutExecutableSchemes = value
+    .replace(/(?:javascript|vbscript)\s*:/gi, '')
+    .replace(/data\s*:\s*text\/html/gi, '');
+  return withoutExecutableSchemes.replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#x27;'
+  })[character]);
 }
 
 function sanitizeObject(value, seen = new WeakSet()) {
@@ -53,6 +52,8 @@ function createXssWaf(options = {}) {
 
   return function xssWaf(req, res, next) {
     try {
+      if (config.whiteListPaths.includes(req.path)) return next();
+
       const sources = {
         query: req.query || {},
         body: req.body || {},
@@ -74,15 +75,19 @@ function createXssWaf(options = {}) {
       }
 
       const breached = findings.filter((finding) => finding.threatScore >= config.threshold);
+      const riskScore = findings.reduce((highest, finding) => Math.max(highest, finding.threatScore), 0);
+      recordScannedRequest(riskScore);
       if (!breached.length) return next();
 
       if (config.mode === 'block') {
+        recordAction('BLOCKED');
         for (const finding of breached) {
           const event = createLogEvent(req, finding, 'BLOCKED');
+          recordEvent(event);
           if (config.customLogger) config.customLogger(event);
           else if (config.logger) logEvent(event);
         }
-        return res.status(403).json({ error: 'Forbidden', message: 'Request blocked by XSS WAF.' });
+        return res.status(403).json({ error: 'Access Denied' });
       }
 
       // Normalize first so double-encoded threats are represented in the request object,
@@ -100,9 +105,11 @@ function createXssWaf(options = {}) {
 
       for (const finding of breached) {
         const event = createLogEvent(req, finding, 'SANITIZED');
+        recordEvent(event);
         if (config.customLogger) config.customLogger(event);
         else if (config.logger) logEvent(event);
       }
+      recordAction('SANITIZED');
       return next();
     } catch (error) {
       if (config.failClosedOnError) {

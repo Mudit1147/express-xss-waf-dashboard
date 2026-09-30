@@ -68,8 +68,19 @@
     .log-meta { color:var(--muted); font-size:11px; }
     .empty { color:var(--muted); text-align:center; padding:28px 10px; border:1px dashed var(--border); border-radius:12px; }
     .footer-note { color:var(--muted); text-align:center; margin-top:20px; font-size:12px; }
+    .metrics { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:0 0 18px; }
+    .metric { min-width:0; padding:16px 18px; background:rgba(17,23,34,.9); border:1px solid var(--border); border-radius:12px; }
+    .metric-label { color:var(--muted); font-size:12px; }
+    .metric-value { display:block; margin-top:4px; font-size:26px; line-height:1.2; font-weight:800; font-variant-numeric:tabular-nums; }
+    .table-wrap { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; text-align:left; white-space:nowrap; }
+    th, td { padding:10px 12px; border-bottom:1px solid var(--border); }
+    th { color:var(--muted); font-size:11px; font-weight:700; text-transform:uppercase; }
+    td { font:12px/1.45 "SFMono-Regular", Consolas, monospace; }
+    tbody tr:last-child td { border-bottom:0; }
+    .table-empty { color:var(--muted); text-align:center; padding:24px; }
     @media(max-width: 900px) { header { align-items:flex-start; flex-direction:column; } .grid { grid-template-columns:1fr; } }
-    @media(max-width: 560px) { .shell { width:min(100% - 18px, 1440px); padding-top:18px; } .quick { grid-template-columns:1fr; } .result { grid-template-columns:1fr; } .run { width:100%; margin-left:0; } }
+    @media(max-width: 560px) { .shell { width:min(100% - 18px, 1440px); padding-top:18px; } .quick { grid-template-columns:1fr; } .result { grid-template-columns:1fr; } .run { width:100%; margin-left:0; } .metrics { grid-template-columns:1fr; gap:8px; } .metric { padding:12px 14px; } }
   </style>
 </head>
 <body>
@@ -82,6 +93,12 @@
       </div>
       <div class="status"><span class="dot"></span><span id="serverStatus">Checking server…</span></div>
     </header>
+
+    <section class="metrics" aria-label="Threat summary">
+      <article class="metric"><span class="metric-label">Total blocked</span><strong id="totalBlocked" class="metric-value">0</strong></article>
+      <article class="metric"><span class="metric-label">High risk threats</span><strong id="highRisk" class="metric-value">0</strong></article>
+      <article class="metric"><span class="metric-label">Sanitized requests</span><strong id="totalSanitized" class="metric-value">0</strong></article>
+    </section>
 
     <section class="grid">
       <div class="panel">
@@ -117,8 +134,13 @@
             <div class="response"><pre id="response">Click a quick test or run your own JSON payload.</pre></div>
           </div>
           <div class="logs">
-            <div class="panel-head" style="padding:0 0 10px;border:0"><h2>SIEM Events</h2><span id="logCount">0 events</span></div>
-            <div id="logs"><div class="empty">No detections yet. Trigger a malicious payload to generate a structured WAF event.</div></div>
+            <div class="panel-head" style="padding:0 0 10px;border:0"><h2>Recent blocked requests</h2><span id="logCount">0 requests</span></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Timestamp</th><th>Client IP</th><th>Method</th><th>Endpoint</th><th>Risk</th><th>Triggered rules</th></tr></thead>
+                <tbody id="logs"><tr><td class="table-empty" colspan="6">No blocked requests yet.</td></tr></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -139,7 +161,6 @@
     const blockMode = document.getElementById('blockMode');
     const sanitizeMode = document.getElementById('sanitizeMode');
     let mode = 'block';
-    let latestSequence = 0;
 
     function pretty(value) {
       return JSON.stringify(value, null, 2);
@@ -162,25 +183,41 @@
     }
 
     function renderLogs(events) {
-      if (!events.length) return;
-      const existing = logsEl.querySelector('.empty');
-      if (existing) existing.remove();
-      for (const event of events) {
-        const item = document.createElement('div');
-        item.className = 'log-item';
-        const badgeClass = event.actionTaken === 'BLOCKED' ? 'blocked' : 'sanitized';
-        item.innerHTML = `<div class="log-top"><span class="badge ${badgeClass}">${event.actionTaken}</span><strong>${event.targetField}</strong><span class="log-meta">risk ${event.threatScore}</span></div><div class="log-meta">${event.method} ${event.path} · ${event.detectedRules.map(r => r.id).join(', ')}</div>`;
-        logsEl.prepend(item);
+      logsEl.replaceChildren();
+      logCountEl.textContent = `${events.length} request${events.length === 1 ? '' : 's'}`;
+      if (!events.length) {
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        cell.className = 'table-empty';
+        cell.colSpan = 6;
+        cell.textContent = 'No blocked requests yet.';
+        row.append(cell);
+        logsEl.append(row);
+        return;
       }
-      logCountEl.textContent = `${document.querySelectorAll('.log-item').length} event${document.querySelectorAll('.log-item').length === 1 ? '' : 's'}`;
+      for (const event of events) {
+        const row = document.createElement('tr');
+        for (const value of [event.timestamp, event.ip || 'Unknown', event.method, event.path, event.riskScore, event.triggeredRules.join(', ')]) {
+          const cell = document.createElement('td');
+          cell.textContent = value;
+          row.append(cell);
+        }
+        logsEl.append(row);
+      }
     }
 
-    async function refreshLogs() {
+    async function refreshThreats() {
       try {
-        const res = await fetch(`/api/logs?after=${latestSequence}`, { cache: 'no-store' });
-        const data = await res.json();
-        latestSequence = data.latestSequence;
-        renderLogs(data.events || []);
+        const [summaryResponse, logsResponse] = await Promise.all([
+          fetch('/api/threats/summary', { cache: 'no-store' }),
+          fetch('/api/threats/logs', { cache: 'no-store' })
+        ]);
+        if (!summaryResponse.ok || !logsResponse.ok) return;
+        const [summary, data] = await Promise.all([summaryResponse.json(), logsResponse.json()]);
+        document.getElementById('totalBlocked').textContent = summary.totalBlocked ?? 0;
+        document.getElementById('highRisk').textContent = summary.riskTiers?.HIGH ?? 0;
+        document.getElementById('totalSanitized').textContent = summary.totalSanitized ?? 0;
+        renderLogs(data.logs || []);
       } catch (_) {}
     }
 
@@ -208,7 +245,7 @@
         let data;
         try { data = JSON.parse(text); } catch (_) { data = { raw: text }; }
         showResult(res.status, data, Math.round(performance.now() - start));
-        await refreshLogs();
+        await refreshThreats();
       } catch (error) {
         showResult(0, { error: 'Request failed', message: error.message }, Math.round(performance.now() - start));
         resultEl.querySelector('.status-code').textContent = 'ERR';
@@ -234,7 +271,8 @@
       .then(data => { serverStatus.textContent = data.status === 'running' ? 'WAF server online' : 'Server unavailable'; })
       .catch(() => { serverStatus.textContent = 'Server unavailable'; });
 
-    setInterval(refreshLogs, 2000);
+    refreshThreats();
+    setInterval(refreshThreats, 3000);
   </script>
 </body>
 </html>

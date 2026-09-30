@@ -4,6 +4,7 @@ const express = require('express');
 const path = require('path');
 const { createXssWaf } = require('./src');
 const { logEvent } = require('./src/utils/logger');
+const threatRoutes = require('./src/dashboard');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -22,20 +23,23 @@ function captureEvent(event) {
 
 const blockWaf = createXssWaf({
   mode: 'block',
-  threshold: 10,
+  threshold: 8,
   inspectHeaders: ['user-agent', 'referer', 'x-forwarded-for'],
+  whiteListPaths: ['/api/status', '/api/logs', '/api/threats/summary', '/api/threats/logs'],
   customLogger: captureEvent
 });
 
 const sanitizeWaf = createXssWaf({
   mode: 'sanitize',
-  threshold: 10,
+  threshold: 8,
   inspectHeaders: ['user-agent', 'referer', 'x-forwarded-for'],
+  whiteListPaths: ['/api/status', '/api/logs', '/api/threats/summary', '/api/threats/logs'],
   customLogger: captureEvent
 });
 
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+app.use('/api/threats', threatRoutes);
 
 // Select the WAF mode using the X-WAF-Mode request header. The UI sends either
 // "block" or "sanitize". Unknown values safely fall back to block mode.

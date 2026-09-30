@@ -1,8 +1,9 @@
-<<<<<<< HEAD
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Express](https://img.shields.io/badge/Express-4.18%2B-000000?logo=express)](https://expressjs.com/)
+[![Jest](https://img.shields.io/badge/tests-Jest-C21325?logo=jest&logoColor=white)](https://jestjs.io/)
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
 # express-xss-waf-dashboard
-XSS attack protection WAF project. 
-=======
-# express-xss-waf
 
 A lightweight, configurable XSS-focused Web Application Firewall middleware for Express.js. It recursively inspects request query parameters, bodies, route parameters and selected headers; normalizes common obfuscation; scores matched signatures; blocks or sanitizes requests; and emits structured SIEM-friendly events.
 
@@ -30,7 +31,7 @@ app.use(express.json());
 
 app.use(createXssWaf({
   mode: 'block',
-  threshold: 10,
+  threshold: 8,
   inspectHeaders: ['user-agent', 'referer']
 }));
 
@@ -43,14 +44,24 @@ app.listen(3000);
 
 Place the middleware **after body parsers** (`express.json()`, `express.urlencoded()`) if you want it to inspect parsed request bodies.
 
+## Request flow
+
+```text
+Request -> Decoder -> Signature Scanner -> Threshold Decision
+                       |          |
+                     Controller   403 Access Denied
+                     (next())
+```
+
 ## Configuration
 
 | Option | Default | Description |
 |---|---|---|
 | `mode` | `block` | `block` returns 403 when a finding meets the threshold. `sanitize` mutates parsed inputs and calls `next()`. |
-| `threshold` | `10` | Minimum per-field threat score required to trigger mitigation. |
+| `threshold` | `8` | Minimum per-field threat score required to trigger mitigation. |
 | `maxDecodePasses` | `4` | Maximum normalization passes. Bounded to prevent unbounded decoding work. |
 | `inspectHeaders` | `['user-agent','referer','x-forwarded-for']` | `false`, `true`, or an array of header names. |
+| `whiteListPaths` | `[]` | Exact Express paths to bypass before scanning, e.g. `['/health']`. |
 | `customLogger` | `null` | Function receiving a structured event object. |
 | `whiteList` | `[]` | Exact field paths, regular expressions, or predicate functions. |
 | `maxDepth` | `20` | Maximum recursive object depth. |
@@ -90,9 +101,11 @@ A blocked or sanitized finding produces an event like:
 
 The default logger serializes this event as one JSON line through `console.info()`.
 
+The demo server also exposes `GET /api/threats/summary` and `GET /api/threats/logs`. The in-memory dashboard store retains the latest 100 events; summary counters are process-local and reset on restart.
+
 ## Sanitization mode
 
-`sanitize` is deliberately conservative and removes executable constructs rather than attempting to turn arbitrary HTML into a safe HTML subset. It normalizes parsed query/body/params first, then strips dangerous tags, inline handlers and executable URI schemes.
+`sanitize` is deliberately conservative and does not attempt to turn arbitrary HTML into a safe HTML subset. It normalizes parsed query/body/params first, strips executable URI schemes, and HTML-entity-escapes markup characters in-place.
 
 For applications that intentionally accept rich HTML, use a dedicated HTML sanitizer with a narrowly defined allowlist and continue to apply contextual output encoding. Do not treat this package as a substitute for browser-side CSP or server-side validation.
 
@@ -135,4 +148,3 @@ The test suite covers decoder normalization, recursive arrays/objects, cycles, r
 - Do not log raw malicious payloads; this package's event format records rule metadata and target fields rather than the original input.
 - Forward structured events to your SIEM through your existing logging pipeline.
 - Test rules against your application's actual content types before deploying a blocking threshold.
->>>>>>> 6a7bba1 (XSS attack prevention project)

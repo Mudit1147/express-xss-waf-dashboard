@@ -4,13 +4,13 @@ module.exports = [
   {
     id: 'XSS_PSEUDO_PROTOCOL',
     description: 'Executable or HTML data URI scheme',
-    severity: 10,
+    severity: 9,
     pattern: /(?:^|[\s"'=(])(?:javascript|vbscript)\s*:/i
   },
   {
     id: 'XSS_DATA_HTML',
     description: 'HTML data URI scheme',
-    severity: 10,
+    severity: 9,
     pattern: /(?:^|[\s"'=(])data\s*:\s*text\/html(?:[;,]|$)/i
   },
   {

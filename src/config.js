@@ -2,10 +2,11 @@
 
 const DEFAULT_CONFIG = Object.freeze({
   mode: 'block',
-  threshold: 10,
+  threshold: 8,
   maxDecodePasses: 4,
   inspectHeaders: ['user-agent', 'referer', 'x-forwarded-for'],
   whiteList: [],
+  whiteListPaths: [],
   logger: true,
   customLogger: null,
   maxDepth: 20,
@@ -36,6 +37,9 @@ function validateConfig(options = {}) {
   }
   if (!Array.isArray(config.whiteList)) {
     throw new TypeError("express-xss-waf: 'whiteList' must be an array.");
+  }
+  if (!Array.isArray(config.whiteListPaths) || config.whiteListPaths.some((path) => typeof path !== 'string')) {
+    throw new TypeError("express-xss-waf: 'whiteListPaths' must be an array of path strings.");
   }
   if (config.customLogger !== null && typeof config.customLogger !== 'function') {
     throw new TypeError("express-xss-waf: 'customLogger' must be a function or null.");

@@ -34,7 +34,7 @@ module.exports = [
   {
     id: 'XSS_TAG_SVG',
     description: 'SVG element',
-    severity: 7,
+    severity: 8,
     pattern: /<\s*svg\b[^>]*>/i
   },
   {
