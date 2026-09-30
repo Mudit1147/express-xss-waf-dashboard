@@ -1,4 +1,4 @@
-[![Node.js](https://img.shields.io/badge/Node.js-18%2B-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-24.x-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Express](https://img.shields.io/badge/Express-4.18%2B-000000?logo=express)](https://expressjs.com/)
 [![Jest](https://img.shields.io/badge/tests-Jest-C21325?logo=jest&logoColor=white)](https://jestjs.io/)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
@@ -11,7 +11,7 @@ A lightweight, configurable XSS-focused Web Application Firewall middleware for 
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 24.x
 - Express 4.18+ or 5.x
 
 ## Installation
