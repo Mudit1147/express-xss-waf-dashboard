@@ -1,3 +1,86 @@
 'use strict';
 
-module.exports = require('./demo');
+const express = require('express');
+const path = require('path');
+const { createXssWaf } = require('./src');
+const { logEvent } = require('./src/utils/logger');
+const threatRoutes = require('./src/dashboard');
+
+const app = express();
+
+app.use((req, res, next) => {
+	if (req.path === '/favicon.ico' || req.path === '/favicon.png') {
+		return res.status(204).end();
+	}
+	if (req.path === '/' && /^vercel-favicon\/1\.0(?:\s|$)/i.test(req.get('user-agent') || '')) {
+		return res.status(204).end();
+	}
+	return next();
+});
+
+const siemEvents = [];
+let eventSequence = 0;
+
+function captureEvent(event) {
+	const record = { sequence: ++eventSequence, ...event };
+	siemEvents.push(record);
+	logEvent(event);
+	if (siemEvents.length > 100) siemEvents.shift();
+}
+
+const whiteListPaths = ['/api/status', '/api/logs', '/api/threats/summary', '/api/threats/logs'];
+const wafOptions = {
+	threshold: 8,
+	inspectHeaders: ['user-agent', 'referer', 'x-forwarded-for'],
+	whiteListPaths,
+	customLogger: captureEvent
+};
+
+const blockWaf = createXssWaf({ ...wafOptions, mode: 'block' });
+const sanitizeWaf = createXssWaf({ ...wafOptions, mode: 'sanitize' });
+
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+app.use('/api/threats', threatRoutes);
+
+app.use((req, res, next) => {
+	const mode = String(req.get('x-waf-mode') || 'block').toLowerCase();
+	return (mode === 'sanitize' ? sanitizeWaf : blockWaf)(req, res, next);
+});
+
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/', (req, res) => {
+	res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/api/status', (req, res) => {
+	res.json({ status: 'running' });
+});
+
+app.get('/api/logs', (req, res) => {
+	const after = Number.parseInt(req.query.after, 10) || 0;
+	const events = siemEvents.filter((event) => event.sequence > after);
+	res.json({ events, latestSequence: eventSequence });
+});
+
+app.post('/api/test', (req, res) => {
+	res.json({
+		status: 'passed',
+		message: 'Request reached the Express route.',
+		received: req.body
+	});
+});
+
+app.use((req, res) => res.status(404).json({ error: 'Route not found' }));
+
+app.use((error, req, res, next) => {
+	if (res.headersSent) return next(error);
+	console.error('[DEMO ERROR]', error);
+	return res.status(400).json({
+		error: 'Bad Request',
+		message: error.message || 'Unable to process request.'
+	});
+});
+
+module.exports = app;
