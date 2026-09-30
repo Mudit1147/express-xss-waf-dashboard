@@ -25,7 +25,7 @@ function sanitizeValue(value) {
 }
 
 function sanitizeObject(value, seen = new WeakSet()) {
-  if (typeof value !== 'string') return sanitizeValue(value);
+  if (typeof value === 'string') return sanitizeValue(value);
   if (!value || typeof value !== 'object') return value;
   if (seen.has(value)) return value;
   seen.add(value);
