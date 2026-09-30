@@ -1,0 +1,23 @@
+name: Node.js CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18.x'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Lint
+        run: npm run lint
+        env:
+          ESLINT_USE_FLAT_CONFIG: 'false'
