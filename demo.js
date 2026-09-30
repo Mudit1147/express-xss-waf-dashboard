@@ -82,6 +82,10 @@ app.post('/api/test', (req, res) => {
   });
 });
 
+app.use((req, res) => {
+  return res.status(404).json({ error: 'Route not found' });
+});
+
 app.use((error, req, res, next) => {
   if (res.headersSent) return next(error);
   console.error('[DEMO ERROR]', error);

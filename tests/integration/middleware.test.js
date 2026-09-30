@@ -89,6 +89,12 @@ describe('Express integration', () => {
 });
 
 describe('Vercel entrypoint probes', () => {
+  test('serves the dashboard from the root path', async () => {
+    const response = await request(demoApp).get('/');
+    expect(response.status).toBe(200);
+    expect(response.type).toMatch(/html/);
+  });
+
   test.each(['/favicon.ico', '/favicon.png'])('returns immediately for %s', async (path) => {
     const response = await request(demoApp).get(path);
     expect(response.status).toBe(204);
@@ -97,5 +103,11 @@ describe('Vercel entrypoint probes', () => {
   test('returns immediately for the Vercel favicon probe on the root path', async () => {
     const response = await request(demoApp).get('/').set('User-Agent', 'vercel-favicon/1.0');
     expect(response.status).toBe(204);
+  });
+
+  test('returns a completed 404 response for unknown routes', async () => {
+    const response = await request(demoApp).get('/not-found');
+    expect(response.status).toBe(404);
+    expect(response.body).toEqual({ error: 'Route not found' });
   });
 });
