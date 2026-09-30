@@ -1,4 +1,4 @@
-const { normalizeString } = require('../../src/utils/decoder');
+const { normalizeString, parseUrlSafe } = require('../../src/utils/decoder');
 
 describe('decoder', () => {
   test.each([
@@ -29,5 +29,16 @@ describe('decoder', () => {
     const input = '%252525253Cscript%252525253E';
     expect(normalizeString(input, { maxPasses: 1 })).not.toContain('<script>');
     expect(normalizeString(input, { maxPasses: 5 })).toContain('<script>');
+  });
+
+  test('parses relative URLs with the WHATWG URL API', () => {
+    const parsed = parseUrlSafe('/search?q=x');
+    expect(parsed.pathname).toBe('/search');
+    expect(parsed.searchParams.get('q')).toBe('x');
+  });
+
+  test('returns null for invalid URL input', () => {
+    expect(parseUrlSafe(null)).toBeNull();
+    expect(parseUrlSafe('http://[invalid')).toBeNull();
   });
 });

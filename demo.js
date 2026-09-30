@@ -9,6 +9,16 @@ const threatRoutes = require('./src/dashboard');
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+app.use((req, res, next) => {
+  if (req.path === '/favicon.ico' || req.path === '/favicon.png') {
+    return res.status(204).end();
+  }
+  if (req.path === '/' && /^vercel-favicon\/1\.0(?:\s|$)/i.test(req.get('user-agent') || '')) {
+    return res.status(204).end();
+  }
+  return next();
+});
+
 // The dashboard can switch between the two supported mitigation modes per request.
 // Each middleware instance is immutable, which avoids mutating shared configuration.
 const siemEvents = [];
@@ -81,7 +91,7 @@ app.use((error, req, res, next) => {
   });
 });
 
-if (require.main === module) {
+if (require.main === module && process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`\n  express-xss-waf live dashboard`);
     console.log(`  Local:  http://localhost:${PORT}`);

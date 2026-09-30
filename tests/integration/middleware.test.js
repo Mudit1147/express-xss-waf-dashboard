@@ -2,6 +2,7 @@ const express = require('express');
 const request = require('supertest');
 const createXssWaf = require('../../src');
 const threatRoutes = require('../../src/dashboard');
+const demoApp = require('../../index');
 
 function appWith(mode = 'block', extra = {}) {
   const app = express();
@@ -84,5 +85,17 @@ describe('Express integration', () => {
       riskScore: 10,
       triggeredRules: ['XSS_TAG_SCRIPT']
     });
+  });
+});
+
+describe('Vercel entrypoint probes', () => {
+  test.each(['/favicon.ico', '/favicon.png'])('returns immediately for %s', async (path) => {
+    const response = await request(demoApp).get(path);
+    expect(response.status).toBe(204);
+  });
+
+  test('returns immediately for the Vercel favicon probe on the root path', async () => {
+    const response = await request(demoApp).get('/').set('User-Agent', 'vercel-favicon/1.0');
+    expect(response.status).toBe(204);
   });
 });
